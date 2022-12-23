@@ -5,9 +5,10 @@ mod types;
 use ansi_term::Colour::{Red, White, RGB};
 use cpu::get_all_moves;
 use moves::*;
-use std::fmt::format;
 use std::fs;
+use std::io::{BufRead, BufReader};
 use std::io::{stdin, Write};
+use std::os::windows::process;
 use types::*;
 
 fn main() {
@@ -16,7 +17,7 @@ fn main() {
     arrow_print("Welcome to E-Chess!", true);
     arrow_print("Input 'exit' to exit the application at anytime.", false);
     arrow_print(
-        "What do you want to play?\n\n(1) Local Multiplayer\n(2) Computer vs Computer\n(3) Singleplayer vs Computer\n",
+        "What do you want to play?\n\n(1) Local Multiplayer\n(2) Computer vs Computer\n(3) Singleplayer vs Computer\n(4) Play back previous game",
         false,
     );
 
@@ -30,6 +31,7 @@ fn main() {
             1 => mp_game_loop(board),
             2 => pc_game_loop(board),
             3 => sp_game_loop(board),
+            4 => play_back_game(board),
             _ => {
                 arrow_print("Invalid input!", true);
                 continue;
@@ -417,6 +419,134 @@ fn sp_game_loop(mut board: Board) {
 
         new_turn(&mut board, false, false, file.as_mut());
     }
+}
+
+fn play_back_game(mut board: Board) {
+    // List the files in the current directory
+    let mut entries = match fs::read_dir(".") {
+        Ok(entries) => entries,
+        Err(_) => {
+            println!("Error reading directory");
+            std::process::exit(0);
+        }
+    };
+
+    if entries.next().is_none(){
+        println!("no games found");
+        std::process::exit(0);
+    }
+    // Filter the entries to only include files with the .edvard ending
+    let mut edvard_files = Vec::new();
+    for entry in entries {
+        let entry = entry.unwrap();
+        if entry.file_type().unwrap().is_file() {
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "edvard") {
+                edvard_files.push(path);
+            }
+        }
+    }
+
+    // Print the names of the .edvard files
+    
+
+    let file_index: usize;
+    
+    loop {
+        println!("Choose a file to play");
+        
+        for (i, file) in edvard_files.iter().enumerate() {
+            println!("{}: {}", i + 1, file.display());
+        }
+        print!("{} ", White.bold().paint(">>>"));
+        std::io::stdout().flush().unwrap();
+        let mut input = String::new();
+        stdin().read_line(&mut input).unwrap();
+
+        let input = input.trim().parse::<usize>();
+        if  input.is_ok(){
+            file_index = input.unwrap();
+            break;
+        } else {
+            print!("Invalid input");
+            continue;
+        }
+    }
+
+    let file_name = edvard_files.get(file_index - 1).map_or("".to_string(), |path| {
+        // Get the file name without the extension
+        let file_name = path.file_stem().unwrap().to_str().unwrap();
+        // Replace any invalid characters with underscores
+        let file_name = file_name.replace(|c: char| !c.is_ascii_alphanumeric() && c != '_', "_");
+        file_name
+    });
+    println!("You chose: {}", file_name);
+
+
+    let file = fs::File::open(file_name + ".edvard").unwrap();
+
+    // Create a BufReader to read from the file line by line
+    let reader = BufReader::new(file);
+    let mut moves: Vec<((usize, usize), (usize, usize))> = Vec::new();
+
+    // Read each line from the file and parse the values
+    for line in reader.lines() {
+        let line = line.unwrap();
+        let parts: Vec<&str> = line.split(":").collect();
+        let start: (usize, usize) = match parse_coord(parts[0]) {
+            Ok(coord) => coord,
+            Err(err) => {
+                println!("Error parsing coordinate: {}", err);
+                return;
+            }
+        };
+        let end: (usize, usize) = match parse_coord(parts[1]) {
+            Ok(coord) => coord,
+            Err(err) => {
+                println!("Error parsing coordinate: {}", err);
+                return;
+            }
+        };
+        moves.push((start, end));
+    }
+
+    // Print the moves
+    for move_ in & moves {
+        println!("{:?}:{:?}", move_.0, move_.1);
+    }
+
+    let mut board = Board::new();
+    let mut white = false;
+
+    for move_ in moves{
+        clear_draw(board, true);
+        println!("Press enter to go forward");
+        white = !white;
+        match move_piece(&mut board, move_.0, move_.1, white){
+            Ok(()) => {},
+            Err(_) => {}
+        }
+        let mut input = String::new();
+        stdin().read_line(&mut input).unwrap();
+    }
+
+    println!("Playback finished");
+
+}
+fn parse_coord(s: &str) -> Result<(usize, usize), &'static str> {
+    let parts: Vec<&str> = s.trim_matches(|c| c == '(' || c == ')' || c == ' ').trim().split(",").collect();
+    if parts.len() != 2 {
+        return Err("Invalid coordinate length");
+    }
+    let x: usize = match parts[0].trim().parse() {
+        Ok(num) => num,
+        Err(_) => return Err("Invalid coordinate x"),
+    };
+    let y: usize = match parts[1].trim().parse() {
+        Ok(num) => num,
+        Err(_) => return Err("Invalid coordinate y"),
+    };
+    Ok((x, y))
 }
 
 fn new_turn(board: &mut Board, is_white: bool, clear: bool, write_file: Option<&mut std::fs::File>) {
