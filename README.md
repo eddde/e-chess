@@ -1,12 +1,3 @@
-# C-Chess
-When complete, C-Chess will be a half-complete CLI Chess game.
+# E-Chess
+This is an extension of C-Chess were recording and playing back games are possible.
 
-Local multiplayer is turn-based multiplayer on one machine.<br>
-Singleplayer will pit you versus a chess engine powered by a minimax algorithm.
-
-# To-do
-- [x] Checkmates
-- [x] Main menu (choosing singleplayer or multiplayer)
-- [x] Minimax algorithm for singleplayer
-- [ ] Castling and other "exotic" moves
-- [ ] Saving game states
