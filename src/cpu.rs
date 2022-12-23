@@ -113,18 +113,13 @@ pub fn negamax(
     depth: i32,
     mut alpha: i32,
     beta: i32,
-    is_white: bool,
-    old_boards: &mut HashMap<([[Tile; 8]; 8], bool, i32), i32>,
+    is_white: bool
 ) -> i32 {
     if depth == 0 {
         return evaluate_board(board, is_white);
     }
 
     let mut best_score = -1000000;
-
-    if let Some(score) = old_boards.get(&(board.tiles, is_white, depth)) {
-        return *score;
-    }
 
     let moves = get_all_moves(board, is_white);
 
@@ -137,7 +132,7 @@ pub fn negamax(
                 Err(_) => continue,
             }
 
-            let score = -negamax(new_board, depth - 1, -beta, -alpha, !is_white, old_boards);
+            let score = -negamax(new_board, depth - 1, -beta, -alpha, !is_white);
 
             if score >= beta {
                 return beta;
@@ -153,8 +148,6 @@ pub fn negamax(
         }
     }
 
-    old_boards.insert((board.tiles, is_white, depth), best_score);
-
     return best_score;
 }
 
@@ -164,7 +157,6 @@ pub fn get_best_move(
     mut depth: i32,
     is_white: bool,
 ) -> ((usize, usize), (usize, usize)) {
-    let mut old_boards = HashMap::new();
     let mut best_score = -1000000;
     let mut best_move = ((0, 0), (0, 0));
 
@@ -192,8 +184,7 @@ pub fn get_best_move(
                 depth,
                 -1000000,
                 1000000,
-                !is_white,
-                &mut old_boards,
+                !is_white
             );
 
             if score > best_score {
